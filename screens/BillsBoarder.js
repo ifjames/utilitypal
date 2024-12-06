@@ -50,7 +50,7 @@ const BillsBoarderScreen = ({ route }) => {
                     await getDoc(userRef); // Ensure user exists before updating
                     await updateDoc(userRef, { billstatus: fetchedBills.length }); // Update bill count
                 } catch (error) {
-                    console.error("Error updating bill status:", error);
+                   // console.error("Error updating bill status:", error);
                 }
             });
     
@@ -98,9 +98,8 @@ const BillsBoarderScreen = ({ route }) => {
                                     <Text style={styles.billDetail}>Previous Reading: {bill.waterBill.prevReading} m³</Text>
                                     <Text style={styles.billDetail}>Current Reading: {bill.waterBill.currReading} m³</Text>
                                     <Text style={styles.billDetail}>Consumed: {bill.waterBill.consumed} m³</Text>
-                                    <Text style={styles.billDetail}>Basic Charge: ₱{bill.waterBill.basicCharge}</Text>
-                                    <Text style={styles.billDetail}>Environmental Fee: ₱{bill.waterBill.environmentalFee}</Text>
-                                    <Text style={styles.billDetail}>VAT: ₱{bill.waterBill.vat}</Text>
+                                    <Text style={styles.billDetail}>Water Charge: ₱{bill.waterBill.waterCharge}</Text>
+                                    <Text style={styles.billDetail}>VAT (12%): ₱{bill.waterBill.vat}</Text>
                                     <Text style={styles.billDetail}>Total Bill: ₱{bill.waterBill.totalBill}</Text>
                                 </>
                             )}

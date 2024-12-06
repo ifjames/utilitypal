@@ -56,10 +56,10 @@ const BillCalcuScreen = () => {
         snapshot.forEach((doc) => console.log("Fetched boarder:", doc.data()));
         if (!snapshot.empty) {
             const fetchedBoarders = snapshot.docs.map((doc) => doc.id); // Get boarder IDs
-            console.log("Fetched Boarders:", fetchedBoarders); // Debugging line
+           // console.log("Fetched Boarders:", fetchedBoarders); // Debugging line
             setBoarders(fetchedBoarders); // Set the fetched boarders
         } else {
-            console.warn(`No boarders found for room ${roomNumber}`);
+           // console.warn(`No boarders found for room ${roomNumber}`);
             setBoarders([]); // Clear boarders when no matches
         }
         
@@ -81,24 +81,58 @@ const BillCalcuScreen = () => {
       return;
     }
   
-    // Charges 
-    const basicCharge = 121.97;
-    const environmentalFee = 6.0;
-    const vat = (basicCharge + environmentalFee) * 0.12;
-    const totalWaterBill = basicCharge + environmentalFee + vat;
+    // Define the rate tiers
+    const firstTierRate = 187.00; // First 10 m³
+    const secondTierRate = 23.25; // Next 10 m³
+    const thirdTierRate = 29.25; // Next 10 m³
+    const fourthTierRate = 35.75; // Next 10 m³
+    const fifthTierRate = 43.00; // Over 50 m³
   
+    // Compute the total charge based on consumption
+    let totalCharge = 0;
+  
+    // First 10 m³ (fixed rate)
+    const firstTier = Math.min(consumedWater, 10);
+    totalCharge += firstTier > 0 ? firstTierRate : 0;
+  
+    // Second 10 m³ (per m³ rate)
+    const secondTier = Math.min(consumedWater - 10, 10);
+    totalCharge += secondTier > 0 ? secondTier * secondTierRate : 0;
+  
+    // Third 10 m³ (per m³ rate)
+    const thirdTier = Math.min(consumedWater - 20, 10);
+    totalCharge += thirdTier > 0 ? thirdTier * thirdTierRate : 0;
+  
+    // Fourth 10 m³ (per m³ rate)
+    const fourthTier = Math.min(consumedWater - 30, 10);
+    totalCharge += fourthTier > 0 ? fourthTier * fourthTierRate : 0;
+  
+    // Fifth 10 m³ (per m³ rate)
+    const fifthTier = Math.max(consumedWater - 40, 0);
+    totalCharge += fifthTier > 0 ? fifthTier * fifthTierRate : 0;
+  
+    // Calculate VAT
+    const vat = totalCharge * 0.12;
+  
+    // Calculate total bill with VAT
+    const totalWaterBill = totalCharge + vat;
+  
+    // Update water bill state
     const waterData = {
       prevReading: prevWaterReading,
       currReading: currWaterReading,
       consumed: consumedWater.toFixed(2),
-      basicCharge: basicCharge.toFixed(2),
-      environmentalFee: environmentalFee.toFixed(2),
+      waterCharge: totalCharge.toFixed(2),
       vat: vat.toFixed(2),
       totalBill: totalWaterBill.toFixed(2),
     };
   
-    setWaterBillDetails(waterData); // Update state with computed water bill
+    setWaterBillDetails(waterData);
   };
+  
+
+
+  
   // Calculate the bill based on room number, previous reading, current reading, and rate per kWh
   const calculateBill = () => {
     if (!previousReading || !usage || !ratePerKWh || !roomNumber || !dueDate) {
@@ -280,18 +314,19 @@ const BillCalcuScreen = () => {
         </View>
       )}
 
-        {waterBillDetails && (
-        <View style={styles.receiptSection}>
-            <Text style={styles.receiptTitle}>Water Bill Receipt</Text>
-            <Text style={styles.receiptText}>Previous Reading: {waterBillDetails.prevReading}</Text>
-            <Text style={styles.receiptText}>Current Reading: {waterBillDetails.currReading}</Text>
-            <Text style={styles.receiptText}>Consumed: {waterBillDetails.consumed} m³</Text>
-            <Text style={styles.receiptText}>Basic Charge: ₱{waterBillDetails.basicCharge}</Text>
-            <Text style={styles.receiptText}>Environmental Fee: ₱{waterBillDetails.environmentalFee}</Text>
-            <Text style={styles.receiptText}>12% VAT: ₱{waterBillDetails.vat}</Text>
-            <Text style={styles.receiptText}>Total Water Bill: ₱{waterBillDetails.totalBill}</Text>
-        </View>
-        )}
+      {waterBillDetails && (
+          <View style={styles.receiptSection}>
+              <Text style={styles.receiptTitle}>Water Bill Receipt</Text>
+              <Text style={styles.receiptText}>Previous Reading: {waterBillDetails.prevReading}</Text>
+              <Text style={styles.receiptText}>Current Reading: {waterBillDetails.currReading}</Text>
+              <Text style={styles.receiptText}>Consumed: {waterBillDetails.consumed} m³</Text>
+              <Text style={styles.receiptText}>Water Charge: ₱{waterBillDetails.waterCharge}</Text>
+              <Text style={styles.receiptText}>VAT (12%): ₱{waterBillDetails.vat}</Text>
+              <Text style={styles.receiptText}>Total Water Bill: ₱{waterBillDetails.totalBill}</Text>
+          </View>
+      )}
+
+
       {billDetails && (
         <TouchableOpacity style={styles.sendButton} onPress={sendBill}>
           <Text style={styles.sendButtonText}>Send Bill</Text>
