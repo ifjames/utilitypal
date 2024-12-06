@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert } from "react-native";
-import { getFirestore, collection, getDocs, doc, setDoc, onSnapshot } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, setDoc, doc, getDocs, query, where } from "firebase/firestore";
+import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { firebaseApp } from "./db/firebase"; 
-import { getAuth } from "firebase/auth";
 import { useNavigation } from "@react-navigation/native";
 
 const AdminScreen = () => {
   const [boarderName, setBoarderName] = useState(""); // Input for the boarder's name
   const [newRoom, setNewRoom] = useState(""); // Input for the new room number
+  const [role, setRole] = useState(""); // Input for role (Boarder or Landlord)
+  const [email, setEmail] = useState(""); // Input for email (e.g., boarder1@gmail.com)
+  const [password, setPassword] = useState(""); // Input for password
   const [accounts, setAccounts] = useState([]); // Store all accounts
   const navigation = useNavigation(); // Initialize navigation
   const db = getFirestore(firebaseApp); // Firestore instance
@@ -28,7 +31,6 @@ const AdminScreen = () => {
     // Cleanup listener on component unmount
     return () => unsubscribe();
   }, []);
-  
 
   // Handle room change for a boarder
   const handleRoomChange = async () => {
@@ -36,36 +38,22 @@ const AdminScreen = () => {
       Alert.alert("Validation Error", "Please fill in both fields.");
       return;
     }
-  
+
     // Find the boarder by name
     const boarder = accounts.find(
       (account) => account.name.toLowerCase() === boarderName.toLowerCase()
     );
-  
+
     if (!boarder) {
       Alert.alert("Not Found", "Boarder not found.");
       return;
     }
-  
+
     try {
       const boarderRef = doc(db, "users", boarder.id); // Reference to the specific user document
       await setDoc(boarderRef, { room: newRoom }, { merge: true }); // Update the room in the users collection
-  
-      // Find and update all reports for this boarder
-      const reportsRef = collection(db, "reports");
-      const querySnapshot = await getDocs(reportsRef);
-      const reportsToUpdate = querySnapshot.docs.filter(
-        (doc) => doc.data().boarderName.toLowerCase() === boarderName.toLowerCase()
-      );
-  
-      const updatePromises = reportsToUpdate.map((report) =>
-        setDoc(report.ref, { room: newRoom }, { merge: true }) // Update the room in each matching report
-      );
-  
-      await Promise.all(updatePromises); // Wait for all updates to complete
-  
-      Alert.alert("Success", "Boarder's room and related reports have been updated successfully.");
-  
+      Alert.alert("Success", "Boarder's room has been updated successfully.");
+
       // Clear the inputs
       setBoarderName("");
       setNewRoom("");
@@ -74,7 +62,65 @@ const AdminScreen = () => {
       Alert.alert("Error", "Failed to update the boarder's room.");
     }
   };
+
+  // Handle creating a new boarder
+  const handleCreateBoarder = async () => {
+    if (!boarderName || !role || !email || !password) {
+      Alert.alert("Validation Error", "Please fill in all fields.");
+      return;
+    }
   
+    try {
+      // Check if an account with the same email already exists in Firestore
+      const emailQuery = query(collection(db, "users"), where("email", "==", email));
+      const emailSnapshot = await getDocs(emailQuery);
+  
+      if (!emailSnapshot.empty) {
+        Alert.alert("Error", "An account with this email already exists.");
+        return;
+      }
+  
+      // Check if a boarder with the same name already exists
+      const nameQuery = query(collection(db, "users"), where("name", "==", boarderName));
+      const nameSnapshot = await getDocs(nameQuery);
+  
+      if (!nameSnapshot.empty) {
+        Alert.alert("Error", "A boarder with this name already exists.");
+        return;
+      }
+  
+      // Create the user in Firebase Authentication
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const user = userCredential.user;
+  
+      // Generate custom document ID for the boarder (e.g., "boarder1", "boarder10")
+      const boarderDocumentId = `boarder${user.email.split('@')[0].replace('boarder', '')}`;
+  
+      // Add the new user to Firestore under "users" collection with the custom ID
+      await setDoc(doc(db, "users", boarderDocumentId), {
+        name: boarderName,
+        role: role,
+        room: "None", // Default value for room
+        billSent: false, // Default billSent status
+        billsdue: 0, // Default bills due
+        billstatus: 0, // Default bill status
+        email: email, // Store email as well
+      });
+  
+      Alert.alert("Success", "New boarder account created successfully.");
+  
+      // Clear the inputs
+      setBoarderName("");
+      setRole("");
+      setEmail("");
+      setPassword("");
+    } catch (error) {
+      console.error("Error creating boarder:", error);
+      Alert.alert("Error", "Failed to create boarder account.");
+    }
+  };
+  
+
 
   return (
     <ScrollView style={styles.container}>
@@ -98,13 +144,52 @@ const AdminScreen = () => {
         <Text style={styles.label}>New Room</Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter new room number (e.g., Room1, Room2)"
+          placeholder="Enter new room number"
           value={newRoom}
           onChangeText={setNewRoom}
         />
 
         <TouchableOpacity style={styles.submitButton} onPress={handleRoomChange}>
-          <Text style={styles.submitButtonText}>Apply Changes</Text>
+          <Text style={styles.submitButtonText}>Change Room</Text>
+        </TouchableOpacity>
+      </View>
+
+      <View style={styles.form}>
+        <Text style={styles.label}>Boarder Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter boarder's name"
+          value={boarderName}
+          onChangeText={setBoarderName}
+        />
+
+        <Text style={styles.label}>Role</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter role (Boarder or Landlord)"
+          value={role}
+          onChangeText={setRole}
+        />
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter email (e.g., boarder1@gmail.com)"
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter password"
+          value={password}
+          onChangeText={setPassword}
+          secureTextEntry
+        />
+
+        <TouchableOpacity style={styles.submitButton} onPress={handleCreateBoarder}>
+          <Text style={styles.submitButtonText}>Create Account</Text>
         </TouchableOpacity>
       </View>
 
